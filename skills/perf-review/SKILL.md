@@ -5,8 +5,8 @@ description: >
   frame jank, and time-to-interactive with measurements. Use when the UI feels slow,
   janky, or laggy, for FPS drops, long tasks, input delay, layout thrash, slow lists,
   hot-loop or allocation profiling, SIMD/vectorization questions, data-layout tuning,
-  language/runtime upgrades with perf gains, or before/after benchmarking a change. Reports bottlenecks ranked by user-visible
-  impact with p50/p95 deltas.
+  language/runtime upgrades with perf gains, or before/after benchmarking a change.
+  Reports bottlenecks ranked by user-visible impact with p50/p95 deltas.
 ---
 
 # Perf Review
@@ -83,10 +83,10 @@ Default questions on every hot structure:
 1. State the user-visible lag you are attacking.
 2. Show the profile evidence (hot function, % time, sample scenario).
 3. Check runtime currency: does a recent language/runtime release already speed up this hot path?
-3. Propose the smallest change that hits that hot path.
-4. Implement.
-5. Benchmark before/after with the same scenario.
-6. Keep or revert based on numbers.
+4. Propose the smallest change that hits that hot path.
+5. Implement.
+6. Benchmark before/after with the same scenario.
+7. Keep or revert based on numbers.
 
 If available, use: `hyperfine` (command benchmarks), `perf`/flamegraphs (CPU), `heaptrack`/`massif` (allocations), `lighthouse` and `curl -w` (page load, static files or an already-listening local URL only). Never install tools. Never start a server to obtain a measurement, and never hit a remote host.
 

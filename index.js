@@ -16,6 +16,9 @@
  * (see cordis.patch.yml).
  */
 
+import { readdir, readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+
 /** Plugin name as it appears in the loader. */
 export const name = 'perf-review'
 
@@ -81,8 +84,6 @@ export function parseFrontmatter(source) {
 
 /** Read every valid skill directory under `dir`. Broken files are skipped, never fatal. */
 export async function discoverSkills(dir, onWarn) {
-  const { readdir, readFile } = await import('node:fs/promises')
-  const { join, dirname } = await import('node:path')
   let entries
   try {
     entries = await readdir(dir, { withFileTypes: true })
