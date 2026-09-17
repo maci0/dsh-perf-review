@@ -52,11 +52,8 @@ No config fields. The plugin reads one bundled skill and mounts it; behaviour is
 |---|---|
 | `name` | Skill id — `perf-review`, so the composer exposes `/perf-review`. |
 | `description` | What the model sees when deciding to load the skill. |
-| `whenToUse` | Extra matching text, projected as its own summary field. |
-| `disable-model-invocation` | `true` keeps the agent from loading it on its own. |
-| `user-invocable` | `false` hides it from the `/` menu. |
 
-Any other frontmatter keys are carried through as metadata rather than dropped.
+Both invocation policies are always on — the provider emits `invocation: { modelInvocable: true, userInvocable: true }` — and any other frontmatter key is parsed and ignored.
 
 ## How it works
 
@@ -76,10 +73,10 @@ Runtime dependencies: `@deepseek-ai/dsh-skill` and `yaml`, both declared in `pac
 ## Development
 
 ```sh
-npm test           # node --test plugin.test.js — 16 tests, no build step
+npm test           # node --test plugin.test.js — 14 tests, no build step
 ```
 
-Node `^22.19 || >=24`. Tests cover the frontmatter parser, discovery, the provider's `list`/`get` contract, abort handling, invocation-policy projection, incomplete-root reporting, and a real Cordis composition that mounts and disposes the provider.
+Node `^22.19 || >=24`. Tests cover the frontmatter parser, discovery, the provider's `list`/`get` contract, abort handling, incomplete-root reporting, and a real Cordis composition that mounts and disposes the provider.
 
 ## Licence note
 

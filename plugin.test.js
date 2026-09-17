@@ -47,12 +47,6 @@ test('parseFrontmatter reads a chomped folded scalar', () => {
   assert.equal(parsed.data.description, 'one two')
 })
 
-test('parseFrontmatter reads unquoted booleans as booleans', () => {
-  const parsed = parseFrontmatter('---\ndisable-model-invocation: true\nuser-invocable: false\n---\nbody\n')
-  assert.equal(parsed.data['disable-model-invocation'], true)
-  assert.equal(parsed.data['user-invocable'], false)
-})
-
 test('discoverSkills reads the bundled skill with a usable description', async () => {
   const { candidates: skills, complete } = await discoverSkills(skillsDir)
   assert.equal(complete, true)
@@ -121,7 +115,9 @@ test('a real cordis composition mounts the bundled skill and disposes it', async
   const mod = await import('./index.js')
   const ctx = new Context()
   await ctx.plugin(SkillRegistry)
-  const fiber = await ctx.plugin({ name: mod.name, apply: (scope) => mod.apply(scope) })
+  // The loader mounts the module itself, so the test forwards its `inject`
+  // declaration: cordis refuses `ctx.skills` to a fiber that did not declare it.
+  const fiber = await ctx.plugin({ name: mod.name, inject: mod.inject, apply: (scope) => mod.apply(scope) })
 
   const summaries = await ctx.skills.list()
   assert.deepEqual(summaries.map((s) => s.name), ['perf-review'])
@@ -143,8 +139,7 @@ test('the provider lists candidates and loads their bodies', async () => {
   assert.equal(candidate.rank, BUNDLED_SKILL_RANK)
   assert.equal(candidate.source, 'bundled')
   assert.equal(candidate.provider, 'perf-review')
-  assert.equal(candidate.invocation.modelInvocable, true)
-  assert.equal(candidate.invocation.userInvocable, true)
+  assert.deepEqual(candidate.invocation, { modelInvocable: true, userInvocable: true })
   assert.equal(candidate.resourceBase?.kind, 'directory')
   const definition = await provider.get(candidate)
   assert.ok(definition)
@@ -179,29 +174,6 @@ test('a SKILL.md without name loads under its directory name', async () => {
   }
 })
 
-test('frontmatter invocation controls project into the policy booleans', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'perf-skills-'))
-  try {
-    await mkdir(join(dir, 'model-only'), { recursive: true })
-    await writeFile(join(dir, 'model-only', 'SKILL.md'), '---\ndescription: >\n  A usable description.\nuser-invocable: false\n---\nbody\n')
-    await mkdir(join(dir, 'user-only'), { recursive: true })
-    await writeFile(join(dir, 'user-only', 'SKILL.md'), '---\ndescription: >\n  A usable description.\nwhenToUse: when the UI feels slow\ndisable-model-invocation: true\n---\nbody\n')
-    const provider = createSkillProvider({ skillsDir: dir })
-    const candidates = await provider.list()
-    const modelOnly = candidates.find((c) => c.name === 'model-only')
-    const userOnly = candidates.find((c) => c.name === 'user-only')
-    assert.deepEqual(modelOnly.invocation, { modelInvocable: true, userInvocable: false })
-    assert.deepEqual(userOnly.invocation, { modelInvocable: false, userInvocable: true })
-    assert.equal(userOnly.whenToUse, 'when the UI feels slow')
-    assert.equal(modelOnly.whenToUse, undefined)
-    // Documented keys project into named fields, never into metadata.
-    assert.deepEqual(userOnly.metadata, {})
-    assert.deepEqual((await provider.get(userOnly)).whenToUse, 'when the UI feels slow')
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
 test('apply resolves its skills directory from an install path containing a space', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dsh perf '))
   try {
@@ -214,10 +186,8 @@ test('apply resolves its skills directory from an install path containing a spac
     const mod = await import(pathToFileURL(join(pkg, 'index.js')).href)
     let provider
     mod.apply({
-      inject: (_deps, callback) => callback({
-        logger: { warn: () => {} },
-        skills: { registerProvider: (create) => { provider = create(); return () => {} } },
-      }),
+      logger: { warn: () => {} },
+      skills: { registerProvider: (create) => { provider = create(); return () => {} } },
     })
     const candidates = await provider.list()
     assert.deepEqual(candidates.map((c) => c.name), ['perf-review'])
@@ -229,10 +199,7 @@ test('apply resolves its skills directory from an install path containing a spac
 test('apply registers exactly one skills provider and nothing else', async () => {
   const providers = []
   const ctx = {
-    inject: (deps, callback) => {
-      assert.deepEqual(deps, ['skills'])
-      callback({ skills: { registerProvider: (create) => { providers.push(create()); return () => {} } } })
-    },
+    skills: { registerProvider: (create) => { providers.push(create()); return () => {} } },
   }
   apply(ctx)
   assert.equal(providers.length, 1)

@@ -31,14 +31,11 @@ export const inject = ['skills']
 /** Rank matching a harness bundled skill, re-exported from the registry, so a project/user skill of the same name still wins. */
 export { BUNDLED_SKILL_RANK }
 
-/** Frontmatter keys the harness defines; they project into named summary fields, never into `metadata`. */
-const SUMMARY_KEYS = new Set(['name', 'description', 'whenToUse', 'disable-model-invocation', 'user-invocable'])
-
 /**
  * Read and parse one skill file. Shared by discovery and direct loads so a
  * single file enforces the name/description/frontmatter rules everywhere.
  */
-export async function readSkillFile(path, onWarn, entryName, signal) {
+async function readSkillFile(path, onWarn, entryName, signal) {
   if (signal?.aborted) return undefined
 
   let source
@@ -68,24 +65,10 @@ export async function readSkillFile(path, onWarn, entryName, signal) {
     return undefined
   }
 
-  const metadata = {}
-  for (const [key, value] of Object.entries(parsed.data)) {
-    if (SUMMARY_KEYS.has(key)) continue
-    metadata[key] = value
-  }
-
-  const whenToUse = String(parsed.data.whenToUse ?? '').trim()
-
   return {
     name: skillName,
     description,
-    ...whenToUse === '' ? {} : { whenToUse },
-    invocation: {
-      modelInvocable: parsed.data['disable-model-invocation'] !== true,
-      userInvocable: parsed.data['user-invocable'] !== false,
-    },
     content: parsed.body.trim(),
-    metadata,
     path,
     directory: dirname(path),
   }
@@ -145,13 +128,13 @@ export async function discoverSkills(skillsDir, onWarn, signal) {
   return { candidates: candidates.sort((left, right) => left.name.localeCompare(right.name)), complete: true }
 }
 
+/** Summary for one bundled skill. Every SKILL.md this package ships is invocable by both the model and the user. */
 function summaryOf(skill) {
   return {
     path: skill.path,
     name: skill.name,
     description: skill.description,
-    ...skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse },
-    invocation: skill.invocation,
+    invocation: { modelInvocable: true, userInvocable: true },
     source: 'bundled',
     provider: 'perf-review',
     resourceBase: { kind: 'directory', path: skill.directory },
@@ -159,13 +142,12 @@ function summaryOf(skill) {
 }
 
 /** Build the provider the skill registry mounts. */
-export function createSkillProvider(options) {
-  const { skillsDir, onWarn } = options ?? {}
+export function createSkillProvider({ skillsDir, onWarn }) {
   return {
     name: 'perf-review',
     async list(lookup) {
       const { candidates, complete } = await discoverSkills(skillsDir, onWarn, lookup?.signal)
-      const skills = candidates.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path, metadata: skill.metadata }))
+      const skills = candidates.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path }))
       // Array shorthand on a complete read; an explicit observation otherwise, so the registry cannot cache a failed read as an empty catalog.
       return complete ? skills : { candidates: skills, complete: false }
     },
@@ -177,20 +159,18 @@ export function createSkillProvider(options) {
       // another skill) from loading under the wrong identity.
       const skill = await readSkillFile(candidate.locator, onWarn, basename(dirname(candidate.locator)), lookup?.signal)
       if (skill === undefined || skill.name !== candidate.name) return undefined
-      return { ...summaryOf(skill), content: skill.content, metadata: skill.metadata }
+      return { ...summaryOf(skill), content: skill.content }
     },
   }
 }
 
-/** Mount the plugin: skills provider only. */
+/** Mount the plugin: skills provider only. `inject` above already made the fiber wait for `ctx.skills`. */
 export function apply(ctx) {
-  ctx.inject(['skills'], (scope) => {
-    const warn = (message) => {
-      if (scope.logger?.warn) scope.logger.warn(`[perf-review] ${message}`)
-      else console.warn(`[perf-review] ${message}`)
-    }
-    scope.skills.registerProvider(() =>
-      createSkillProvider({ skillsDir: fileURLToPath(new URL('./skills', import.meta.url)), onWarn: warn }),
-    )
-  })
+  const warn = (message) => {
+    if (ctx.logger?.warn) ctx.logger.warn(`[perf-review] ${message}`)
+    else console.warn(`[perf-review] ${message}`)
+  }
+  ctx.skills.registerProvider(() =>
+    createSkillProvider({ skillsDir: fileURLToPath(new URL('./skills', import.meta.url)), onWarn: warn }),
+  )
 }
