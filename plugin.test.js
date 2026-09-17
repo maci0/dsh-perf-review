@@ -57,7 +57,7 @@ test('discoverSkills skips a file the reader refuses and keeps the rest', async 
 })
 
 test('the provider lists candidates and loads their bodies', async () => {
-  const provider = createSkillProvider(skillsDir)
+  const provider = createSkillProvider({ skillsDir })
   assert.equal(provider.name, 'perf-review')
   const candidates = await provider.list()
   assert.equal(candidates.length, 1)
@@ -67,10 +67,14 @@ test('the provider lists candidates and loads their bodies', async () => {
   assert.equal(candidate.provider, 'perf-review')
   assert.equal(candidate.invocation.modelInvocable, true)
   assert.equal(candidate.invocation.userInvocable, true)
+  assert.equal(candidate.resourceBase?.kind, 'directory')
   const definition = await provider.get(candidate)
   assert.ok(definition)
+  assert.equal(definition.name, 'perf-review')
   assert.match(definition.content, /Profile before you change/)
+  assert.doesNotMatch(definition.content, /^---/)
   assert.equal(await provider.get({ ...candidate, locator: join(skillsDir, 'nope', 'SKILL.md') }), undefined)
+  assert.equal(await provider.get({ ...candidate, name: 'other-skill' }), undefined)
 })
 
 test('apply registers exactly one skills provider and nothing else', async () => {

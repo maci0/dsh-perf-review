@@ -26,6 +26,54 @@ export const name = 'perf-review'
 export const BUNDLED_SKILL_RANK = 600
 
 /**
+ * Read and parse one skill file. Shared by discovery and direct loads so a
+ * single file enforces the name/description/frontmatter rules everywhere.
+ */
+export async function readSkillFile(path, onWarn, entryName) {
+  let source
+  try {
+    source = await readFile(path, 'utf8')
+  } catch {
+    return undefined
+  }
+
+  let parsed
+  try {
+    parsed = parseFrontmatter(source)
+  } catch (error) {
+    onWarn?.(`skipping ${path}: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  }
+
+  const fallback = entryName ?? path.split('/').pop()
+  const skillName = (parsed.data.name ?? fallback).trim()
+  const description = (parsed.data.description ?? '').trim()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName)) {
+    onWarn?.(`skipping ${path}: "${skillName}" is not a valid kebab-case skill name`)
+    return undefined
+  }
+  if (description === '') {
+    onWarn?.(`skipping ${path}: frontmatter has no description`)
+    return undefined
+  }
+
+  const metadata = {}
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (key === 'name' || key === 'description') continue
+    metadata[key] = value
+  }
+
+  return {
+    name: skillName,
+    description,
+    content: parsed.body.trim(),
+    metadata,
+    path,
+    directory: dirname(path),
+  }
+}
+
+/**
  * Parse leading `---` frontmatter: plain `key: value` pairs plus the folded
  * (`>`) block scalar the bundled SKILL.md writes its description as.
  */
@@ -82,49 +130,21 @@ export function parseFrontmatter(source) {
   return { data, body: lines.slice(closing + 1).join('\n') }
 }
 
-/** Read every valid skill directory under `dir`. Broken files are skipped, never fatal. */
-export async function discoverSkills(dir, onWarn) {
+/** Read every valid skill directory under `skillsDir`. Broken files are skipped, never fatal. */
+export async function discoverSkills(skillsDir, onWarn) {
   let entries
   try {
-    entries = await readdir(dir, { withFileTypes: true })
+    entries = await readdir(skillsDir, { withFileTypes: true })
   } catch (error) {
-    onWarn?.(`cannot read skills directory ${dir}: ${error instanceof Error ? error.message : String(error)}`)
+    onWarn?.(`cannot read skills directory ${skillsDir}: ${error instanceof Error ? error.message : String(error)}`)
     return []
   }
   const skills = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const path = join(dir, entry.name, 'SKILL.md')
-    let source
-    try {
-      source = await readFile(path, 'utf8')
-    } catch {
-      continue
-    }
-    let parsed
-    try {
-      parsed = parseFrontmatter(source)
-    } catch (error) {
-      onWarn?.(`skipping ${path}: ${error instanceof Error ? error.message : String(error)}`)
-      continue
-    }
-    const skillName = (parsed.data.name ?? entry.name).trim()
-    const description = (parsed.data.description ?? '').trim()
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName)) {
-      onWarn?.(`skipping ${path}: "${skillName}" is not a valid kebab-case skill name`)
-      continue
-    }
-    if (description === '') {
-      onWarn?.(`skipping ${path}: frontmatter has no description`)
-      continue
-    }
-    skills.push({
-      name: skillName,
-      description,
-      content: parsed.body.trim(),
-      path,
-      directory: dirname(path),
-    })
+    const path = join(skillsDir, entry.name, 'SKILL.md')
+    const skill = await readSkillFile(path, onWarn, entry.name)
+    if (skill !== undefined) skills.push(skill)
   }
   return skills.sort((left, right) => left.name.localeCompare(right.name))
 }
@@ -142,29 +162,32 @@ function summaryOf(skill) {
 }
 
 /** Build the provider the skill registry mounts. */
-export function createSkillProvider(skillsDir, onWarn) {
+export function createSkillProvider(options) {
+  const { skillsDir, onWarn } = options ?? {}
   return {
     name: 'perf-review',
     async list() {
       const skills = await discoverSkills(skillsDir, onWarn)
-      return skills.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path }))
+      return skills.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path, metadata: skill.metadata }))
     },
     async get(candidate) {
       if (typeof candidate.locator !== 'string') return undefined
-      const skills = await discoverSkills(skillsDir, onWarn)
-      const found = skills.find((skill) => skill.path === candidate.locator && skill.name === candidate.name)
-      if (found === undefined) return undefined
-      return { ...summaryOf(found), content: found.content }
+      // Read the locator directly: one file instead of a full re-discovery.
+      // The name check keeps a stale candidate (path reused by another skill)
+      // from loading under the wrong identity.
+      const skill = await readSkillFile(candidate.locator, onWarn)
+      if (skill === undefined || skill.name !== candidate.name) return undefined
+      return { ...summaryOf(skill), content: skill.content, metadata: skill.metadata }
     },
   }
 }
 
-/** Mount the plugin: skills provider only. */
+/** Mount the plugin: skills provider only. Tolerates a ctx without inject (minimal compositions). */
 export function apply(ctx) {
   const warn = (message) => { console.warn(`[perf-review] ${message}`) }
   ctx.inject?.(['skills'], (scope) => {
     scope.skills.registerProvider(() =>
-      createSkillProvider(new URL('./skills', import.meta.url).pathname, warn),
+      createSkillProvider({ skillsDir: new URL('./skills', import.meta.url).pathname, onWarn: warn }),
     )
   })
 }

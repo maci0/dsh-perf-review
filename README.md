@@ -33,3 +33,25 @@ dsh plugin --profile web add /path/to/dsh-perf-review
 ```
 
 Then paste `cordis.patch.yml` into `~/.dsh/profiles/web/cordis.patch.yml`. Saving that file remounts the plugin. `dsh.profile.bundles` is frozen at boot — do not put this package there, or `insert` will register it twice.
+
+### Verify
+
+After the profile patch save:
+
+- `/perf-review` is in the `/` menu;
+- invoking it injects the performance review instructions and the agent starts the audit.
+
+## Development
+
+```sh
+npm test          # node --test plugin.test.js (Node >= 22.6, no build step)
+```
+
+## Uninstall
+
+```sh
+dsh plugin --profile web remove dsh-perf-review
+```
+
+and delete the `id: perf-review` row from
+`~/.dsh/profiles/<profile>/cordis.patch.yml`. Saving unmounts it.
