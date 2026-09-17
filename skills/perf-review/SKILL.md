@@ -28,6 +28,27 @@ Make interaction latency, frame time, and time-to-interactive as low as possible
 3. Benchmark every change that claims speed. Report p50/p95, not only averages.
 4. Keep behavior identical unless a tradeoff is explicit and measured.
 5. Prefer simple architecture that is cache-friendly over clever architecture that is slow.
+6. Leave a deterministic perf test behind. It must still pass on a loaded machine, so it asserts on work counters or CPU time, never on raw wall clock.
+
+## Deterministic perf tests
+
+Wall clock is the product metric and a poor regression test: it moves with frequency scaling, turbo, container CPU quota, and noisy neighbours. A claim of speed is not finished until a test backs it that would hold on a busy CI runner.
+
+Prefer, in this order:
+
+- **Retired instructions and work counters** — `perf stat -e instructions`, `callgrind`, an `iai`-style harness. Nearly load-independent, and the right gate for an algorithmic regression: instructions retired, bytes moved, allocations, syscalls, branch misses.
+- **CPU time** — `getrusage`, `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`, `/usr/bin/time -v`, shell `time` (user+sys). Excludes blocked time, so I/O wait and descheduling do not move it; it still drifts with frequency and cache contention.
+- **Hardware counters as ratios** — `cache-misses`, `LLC-load-misses`, branch misses. Stable for a fixed workload shape; compare ratios, not absolutes, when the clock can move.
+- **Wall clock last** — for the product-level p50/p95 and a coarse sanity bound only. A CI gate on it needs the median of N runs plus a tolerance band, and a note saying it is load-sensitive.
+
+Rules for the test itself:
+
+- Fix the scenario and inputs: no network, no remote host, no dependence on a cold or absent filesystem cache, no reliance on another process finishing first.
+- Warm up (JIT, caches, connection pools), then measure. Report cold start separately if it is the thing being optimized.
+- Pin what the platform allows — CPU affinity (`taskset -c 2`), fixed frequency — and record CPU model, runtime version, and tool version beside the number.
+- Assert a band against a recorded baseline, not an exact value; report the minimum or median of N runs and drop the first.
+- If counters are unavailable (container without perf events, `perf_event_paranoid`, macOS), substitute CPU time and say so. Never fall back to wall clock silently.
+- In a browser, do not gate on `performance.now()`: use a fixed-frame-count synthetic scenario or long-task counts, or run the hot function in Node and read `process.cpuUsage()`.
 
 ## Stack freedom
 
@@ -85,7 +106,7 @@ Default questions on every hot structure:
 3. Check runtime currency: does a recent language/runtime release already speed up this hot path?
 4. Propose the smallest change that hits that hot path.
 5. Implement.
-6. Benchmark before/after with the same scenario.
+6. Benchmark before/after with the same scenario, and leave the deterministic test from "Deterministic perf tests" behind.
 7. Keep or revert based on numbers.
 
 If available, use: `hyperfine` (command benchmarks), `perf`/flamegraphs (CPU), `heaptrack`/`massif` (allocations), `lighthouse` and `curl -w` (page load, static files or an already-listening local URL only). Never install tools. Never start a server to obtain a measurement, and never hit a remote host.
@@ -94,6 +115,7 @@ If available, use: `hyperfine` (command benchmarks), `perf`/flamegraphs (CPU), `
 
 - Bottlenecks found (ranked by user-visible impact, with confidence: confirmed / likely / potential)
 - Changes made (what, why, measured delta)
+- The deterministic test left behind (the counter it asserts, its tolerance, the host and tool versions)
 - Remaining hot paths
 - What you refused to do because it was unmeasured or would not help
 
