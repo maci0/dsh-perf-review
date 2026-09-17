@@ -1,7 +1,10 @@
-# Row to paste into ~/.dsh/profiles/<profile>/cordis.patch.yml.
-# That file is live-watched; dsh.profile.bundles is frozen at boot.
-# Do not also list this package in dsh.profile.bundles: insert does not
-# dedupe ids, two rows would register the plugin twice.
+# The dsh-perf-review bundle patch: applied automatically when a profile lists
+# this bundle (`dsh plugin add`/`update` appends the package to
+# dsh.profile.bundles). Users override this row from their profile's own
+# cordis.patch.yml (live-watched; dsh.profile.bundles is frozen at boot) with a
+# `- id: perf-review` row, which replaces the row's whole `config`.
+# Do not also insert this same row into the profile patch: insert does not
+# dedupe ids, and a second row would register the plugin twice.
 - insert:
     - id: perf-review
       name: 'dsh-perf-review'

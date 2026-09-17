@@ -29,14 +29,13 @@ Gauntlet-derived lines above are adapted from AGPL-3.0 material, which is copyle
 
 ```sh
 dsh plugin --profile web add /path/to/dsh-perf-review
-# pnpm will warn "declares no dsh.bundle — installed as a plain dependency". That is the point.
 ```
 
-Then paste `cordis.patch.yml` into `~/.dsh/profiles/web/cordis.patch.yml`. Saving that file remounts the plugin. `dsh.profile.bundles` is frozen at boot — do not put this package there, or `insert` will register it twice.
+The package declares `dsh.bundle.patch`, so the CLI adds it to that profile's `dsh.profile.bundles` and the shipped `cordis.patch.yml` mounts the plugin. Do not paste that row into `~/.dsh/profiles/web/cordis.patch.yml` as well — the bundle layer already applies it, and a second row registers the plugin twice.
 
 ### Verify
 
-After the profile patch save:
+After the install:
 
 - `/perf-review` is in the `/` menu;
 - invoking it injects the performance review instructions and the agent starts the audit.
@@ -44,7 +43,7 @@ After the profile patch save:
 ## Development
 
 ```sh
-npm test          # node --test plugin.test.js (Node >= 22.6, no build step)
+npm test          # node --test plugin.test.js (Node ^22.19 || >=24, no build step)
 ```
 
 ## Uninstall
@@ -53,5 +52,4 @@ npm test          # node --test plugin.test.js (Node >= 22.6, no build step)
 dsh plugin --profile web remove dsh-perf-review
 ```
 
-and delete the `id: perf-review` row from
-`~/.dsh/profiles/<profile>/cordis.patch.yml`. Saving unmounts it.
+That drops the dependency and the bundle layer with it; nothing else to edit.

@@ -12,27 +12,38 @@
  * ownership-boundary lines from the adjacent concurrency/resource/db/cache
  * reviews.
  *
- * Load via a row in ~/.dsh/profiles/<profile>/cordis.patch.yml
- * (see cordis.patch.yml).
+ * `package.json` declares `dsh.bundle.patch`, so `dsh plugin add` mounts this
+ * package as a profile layer and cordis.patch.yml supplies the row.
  */
 
 import { readdir, readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { BUNDLED_SKILL_RANK, isSkillName } from '@deepseek-ai/dsh-skill'
+import { parse as parseYaml } from 'yaml'
 
 /** Plugin name as it appears in the loader. */
 export const name = 'perf-review'
 
-/** Rank matching a harness bundled skill, so a project/user skill of the same name still wins. */
-export const BUNDLED_SKILL_RANK = 600
+/** Service this plugin needs; `ctx.skills` is ready when `apply` runs. */
+export const inject = ['skills']
+
+/** Rank matching a harness bundled skill, re-exported from the registry, so a project/user skill of the same name still wins. */
+export { BUNDLED_SKILL_RANK }
+
+/** Frontmatter keys the harness defines; they project into named summary fields, never into `metadata`. */
+const SUMMARY_KEYS = new Set(['name', 'description', 'whenToUse', 'disable-model-invocation', 'user-invocable'])
 
 /**
  * Read and parse one skill file. Shared by discovery and direct loads so a
  * single file enforces the name/description/frontmatter rules everywhere.
  */
-export async function readSkillFile(path, onWarn, entryName) {
+export async function readSkillFile(path, onWarn, entryName, signal) {
+  if (signal?.aborted) return undefined
+
   let source
   try {
-    source = await readFile(path, 'utf8')
+    source = await readFile(path, { encoding: 'utf8', signal })
   } catch {
     return undefined
   }
@@ -45,10 +56,10 @@ export async function readSkillFile(path, onWarn, entryName) {
     return undefined
   }
 
-  const fallback = entryName ?? path.split('/').pop()
-  const skillName = (parsed.data.name ?? fallback).trim()
-  const description = (parsed.data.description ?? '').trim()
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName)) {
+  const fallback = entryName ?? basename(path)
+  const skillName = String(parsed.data.name ?? fallback).trim()
+  const description = String(parsed.data.description ?? '').trim()
+  if (!isSkillName(skillName)) {
     onWarn?.(`skipping ${path}: "${skillName}" is not a valid kebab-case skill name`)
     return undefined
   }
@@ -59,13 +70,20 @@ export async function readSkillFile(path, onWarn, entryName) {
 
   const metadata = {}
   for (const [key, value] of Object.entries(parsed.data)) {
-    if (key === 'name' || key === 'description') continue
+    if (SUMMARY_KEYS.has(key)) continue
     metadata[key] = value
   }
+
+  const whenToUse = String(parsed.data.whenToUse ?? '').trim()
 
   return {
     name: skillName,
     description,
+    ...whenToUse === '' ? {} : { whenToUse },
+    invocation: {
+      modelInvocable: parsed.data['disable-model-invocation'] !== true,
+      userInvocable: parsed.data['user-invocable'] !== false,
+    },
     content: parsed.body.trim(),
     metadata,
     path,
@@ -74,79 +92,57 @@ export async function readSkillFile(path, onWarn, entryName) {
 }
 
 /**
- * Parse leading `---` frontmatter: plain `key: value` pairs plus the folded
- * (`>`) block scalar the bundled SKILL.md writes its description as.
+ * Parse leading `---` frontmatter with `yaml`, the parser the harness's own
+ * filesystem skill provider uses: plain scalars, `|`/`|-`/`>-` block scalars,
+ * and nested maps all read as YAML says they do. Frontmatter with no closing
+ * `---` is not frontmatter, and the body is then the whole source.
+ * @returns the parsed mapping and the body that follows it.
  */
 export function parseFrontmatter(source) {
-  const lines = String(source).replace(/^\uFEFF/, '').split(/\r?\n/)
-  if (lines[0] === undefined || !/^---[ \t]*$/.test(lines[0])) return { data: {}, body: String(source) }
+  const text = String(source).replace(/^\uFEFF/, '')
+  const lines = text.split(/\r?\n/)
+  if (lines[0] === undefined || !/^---[ \t]*$/.test(lines[0])) return { data: {}, body: text }
   let closing = -1
   for (let i = 1; i < lines.length; i += 1) {
     if (/^---[ \t]*$/.test(lines[i] ?? '')) { closing = i; break }
   }
-  if (closing === -1) return { data: {}, body: String(source) }
+  if (closing === -1) return { data: {}, body: text }
 
-  const data = {}
-  const block = lines.slice(1, closing)
-  for (let i = 0; i < block.length; i += 1) {
-    const match = /^([A-Za-z0-9_-]+):[ \t]*(.*)$/.exec(block[i] ?? '')
-    if (!match?.[1]) continue
-    const key = match[1]
-    const raw = (match[2] ?? '').trim()
-    if (raw.startsWith('>') || raw.startsWith('|')) {
-      if (raw !== '>') throw new Error(`unsupported block scalar indicator ${JSON.stringify(raw)} for key "${key}"`)
-      // Folded continuation: indented lines join with spaces, blanks break paragraphs.
-      const collected = []
-      let indent = -1
-      let j = i + 1
-      for (; j < block.length; j += 1) {
-        const line = block[j] ?? ''
-        if (line.trim() === '') { collected.push(''); continue }
-        const leading = line.length - line.trimStart().length
-        if (indent === -1) {
-          if (leading === 0 && /^([A-Za-z0-9_-]+):/.test(line)) break
-          indent = leading
-        }
-        if (leading < indent) break
-        collected.push(line.slice(indent))
-      }
-      while (collected.length > 0 && collected[collected.length - 1] === '') collected.pop()
-      const paragraphs = []
-      let current = []
-      for (const line of collected) {
-        if (line === '') { if (current.length > 0) { paragraphs.push(current.join(' ')); current = [] } }
-        else current.push(line)
-      }
-      if (current.length > 0) paragraphs.push(current.join(' '))
-      data[key] = paragraphs.join('\n')
-      i = j - 1
-      continue
-    }
-    data[key] = raw.length >= 2
-      && ((raw[0] === '"' && raw[raw.length - 1] === '"') || (raw[0] === "'" && raw[raw.length - 1] === "'"))
-      ? raw.slice(1, -1)
-      : raw
+  const body = lines.slice(closing + 1).join('\n')
+  const parsed = parseYaml(lines.slice(1, closing).join('\n'))
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    // Empty or non-mapping frontmatter: no keys, but the body still loads.
+    return { data: {}, body }
   }
-  return { data, body: lines.slice(closing + 1).join('\n') }
+  return { data: parsed, body }
 }
 
-/** Read every valid skill directory under `skillsDir`. Broken files are skipped, never fatal. */
-export async function discoverSkills(skillsDir, onWarn) {
+/**
+ * Read every valid skill directory under `skillsDir`. Broken files are skipped, never fatal.
+ * @param signal - aborts discovery for a caller that no longer wants the result.
+ * @returns the candidates plus whether the root itself was readable; an
+ *   unreadable root is incomplete discovery, not an authoritative empty catalog.
+ */
+export async function discoverSkills(skillsDir, onWarn, signal) {
+  if (signal?.aborted) return { candidates: [], complete: false }
+
   let entries
   try {
     entries = await readdir(skillsDir, { withFileTypes: true })
   } catch (error) {
+    if (signal?.aborted) return { candidates: [], complete: false }
     onWarn?.(`cannot read skills directory ${skillsDir}: ${error instanceof Error ? error.message : String(error)}`)
-    return []
+    return { candidates: [], complete: false }
   }
-  const skills = []
+  const candidates = []
   for (const entry of entries) {
+    if (signal?.aborted) break
     if (!entry.isDirectory()) continue
     const path = join(skillsDir, entry.name, 'SKILL.md')
-    const skill = await readSkillFile(path, onWarn, entry.name)
-    if (skill !== undefined) skills.push(skill)
+    const skill = await readSkillFile(path, onWarn, entry.name, signal)
+    if (skill !== undefined) candidates.push(skill)
   }
-  return skills.sort((left, right) => left.name.localeCompare(right.name))
+  return { candidates: candidates.sort((left, right) => left.name.localeCompare(right.name)), complete: true }
 }
 
 function summaryOf(skill) {
@@ -154,7 +150,8 @@ function summaryOf(skill) {
     path: skill.path,
     name: skill.name,
     description: skill.description,
-    invocation: { modelInvocable: true, userInvocable: true },
+    ...skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse },
+    invocation: skill.invocation,
     source: 'bundled',
     provider: 'perf-review',
     resourceBase: { kind: 'directory', path: skill.directory },
@@ -166,28 +163,34 @@ export function createSkillProvider(options) {
   const { skillsDir, onWarn } = options ?? {}
   return {
     name: 'perf-review',
-    async list() {
-      const skills = await discoverSkills(skillsDir, onWarn)
-      return skills.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path, metadata: skill.metadata }))
+    async list(lookup) {
+      const { candidates, complete } = await discoverSkills(skillsDir, onWarn, lookup?.signal)
+      const skills = candidates.map((skill) => ({ ...summaryOf(skill), rank: BUNDLED_SKILL_RANK, locator: skill.path, metadata: skill.metadata }))
+      // Array shorthand on a complete read; an explicit observation otherwise, so the registry cannot cache a failed read as an empty catalog.
+      return complete ? skills : { candidates: skills, complete: false }
     },
-    async get(candidate) {
+    async get(candidate, lookup) {
       if (typeof candidate.locator !== 'string') return undefined
       // Read the locator directly: one file instead of a full re-discovery.
-      // The name check keeps a stale candidate (path reused by another skill)
-      // from loading under the wrong identity.
-      const skill = await readSkillFile(candidate.locator, onWarn)
+      // The directory name is the fallback identity a name-less SKILL.md is
+      // listed under; the name check keeps a stale candidate (path reused by
+      // another skill) from loading under the wrong identity.
+      const skill = await readSkillFile(candidate.locator, onWarn, basename(dirname(candidate.locator)), lookup?.signal)
       if (skill === undefined || skill.name !== candidate.name) return undefined
       return { ...summaryOf(skill), content: skill.content, metadata: skill.metadata }
     },
   }
 }
 
-/** Mount the plugin: skills provider only. Tolerates a ctx without inject (minimal compositions). */
+/** Mount the plugin: skills provider only. */
 export function apply(ctx) {
-  const warn = (message) => { console.warn(`[perf-review] ${message}`) }
-  ctx.inject?.(['skills'], (scope) => {
+  ctx.inject(['skills'], (scope) => {
+    const warn = (message) => {
+      if (scope.logger?.warn) scope.logger.warn(`[perf-review] ${message}`)
+      else console.warn(`[perf-review] ${message}`)
+    }
     scope.skills.registerProvider(() =>
-      createSkillProvider({ skillsDir: new URL('./skills', import.meta.url).pathname, onWarn: warn }),
+      createSkillProvider({ skillsDir: fileURLToPath(new URL('./skills', import.meta.url)), onWarn: warn }),
     )
   })
 }
