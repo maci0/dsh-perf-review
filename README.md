@@ -57,9 +57,9 @@ Both invocation policies are always on — the provider emits `invocation: { mod
 
 ## How it works
 
-`index.js` is plain JavaScript, no build step. It hooks `ctx.skills.registerProvider()`, resolves its `skills/` directory with `fileURLToPath`, and lists every `skills/<name>/SKILL.md` it can read. Candidate summaries carry `rank: BUNDLED_SKILL_RANK`, so a project or user skill of the same name still takes precedence.
+`index.js` is plain JavaScript, no build step. It hooks `ctx.skills.registerProvider()`, resolves its `skills/` directory with `fileURLToPath`, and reads the one bundled `skills/perf-review/SKILL.md` directly. Candidate summaries carry `rank: BUNDLED_SKILL_RANK`, so a project or user skill of the same name still takes precedence.
 
-Frontmatter is parsed with `yaml` — the same parser the harness's own filesystem skill provider uses — so plain scalars, `|`/`|-`/`>-` block scalars, and nested maps read as YAML says they do. An invalid skill name or a description-less file is skipped with a warning, never fatal. An unreadable `skills/` root is reported as an **incomplete observation**, not an empty catalog, so the registry cannot cache a failed read as "no skills here".
+Frontmatter is parsed with `yaml` — the same parser the harness's own filesystem skill provider uses — so plain scalars, `|`/`|-`/`>-` block scalars, and nested maps read as YAML says they do. An invalid skill name or a description-less file is skipped with a warning, never fatal. A missing root or a refused `SKILL.md` is reported as an **incomplete observation**, not an empty catalog, so the registry cannot cache a failed read as "no skills here".
 
 Runtime dependencies: `@deepseek-ai/dsh-skill` and `yaml`, both declared in `package.json`.
 
