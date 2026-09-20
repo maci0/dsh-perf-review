@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "main": "index.js",
-  "description": "Performance review skill for DeepSeek Harness: perceived speed above all — profile before changing, benchmark every claim, keep behavior identical.",
+  "description": "Performance review skill for DeepSeek Harness: perceived speed above all \u2014 profile before changing, benchmark every claim, keep behavior identical.",
   "license": "MIT",
   "exports": {
     ".": "./index.js",
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-scope": "0.1.6-alpha.1",
     "@deepseek-ai/dsh-skill": "0.1.6-alpha.1"
   }
 }
