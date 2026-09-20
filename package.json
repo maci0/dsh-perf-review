@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "main": "index.js",
-  "description": "Performance review skill for DeepSeek Harness: perceived speed above all \u2014 profile before changing, benchmark every claim, keep behavior identical.",
+  "description": "Performance review skill for DeepSeek Harness: perceived speed above all — profile before changing, benchmark every claim, keep behavior identical.",
   "license": "MIT",
   "exports": {
     ".": "./index.js",
@@ -14,6 +14,9 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dsh": ">=0.1.0-rc.8 <0.2.0"
     }
   },
   "files": [
@@ -44,5 +47,9 @@
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-scope": "0.1.6-alpha.1",
     "@deepseek-ai/dsh-skill": "0.1.6-alpha.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maci0/dsh-perf-review.git"
   }
 }
