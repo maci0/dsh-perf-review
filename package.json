@@ -1,10 +1,10 @@
 {
   "name": "dsh-perf-review",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "type": "module",
   "main": "index.js",
-  "description": "Performance review skill for DeepSeek Harness: perceived speed above all — profile before changing, benchmark every claim, keep behavior identical.",
+  "description": "Performance review skill for DeepSeek Harness: perceived speed above all \u2014 profile before changing, benchmark every claim, keep behavior identical.",
   "license": "MIT",
   "exports": {
     ".": "./index.js",
