@@ -1,10 +1,10 @@
 {
   "name": "dsh-perf-review",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "type": "module",
   "main": "index.js",
-  "description": "Performance review skill for DeepSeek Harness: perceived speed above all \u2014 profile before changing, benchmark every claim, keep behavior identical.",
+  "description": "Performance review skill for DeepSeek Harness: perceived speed above all — profile before changing, benchmark every claim, keep behavior identical.",
   "license": "MIT",
   "exports": {
     ".": "./index.js",
@@ -36,20 +36,13 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-skill": "~0.1.7-rc.2",
     "yaml": "2.9.1"
   },
-  "peerDependencies": {
-    "@deepseek-ai/dsh-skill": "*"
-  },
-  "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-skill": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh-scope": "0.1.6-alpha.1",
-    "@deepseek-ai/dsh-skill": "0.1.6-alpha.1"
+    "@deepseek-ai/dsh-skill": "~0.1.7-rc.2"
   },
   "repository": {
     "type": "git",
