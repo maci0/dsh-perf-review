@@ -83,16 +83,60 @@ test('a flat frontmatter block never loads yaml', async () => {
     assert.equal((await flatRead(source)).body, parsed.body)
   }
 
+  // --- perf gate -----------------------------------------------------------
+  // CPU time, never wall clock. The measured block is timed next to a fixed
+  // allocation-shaped reference — the same split and per-line regex a header
+  // read does, without any parsing — inside the same window, so a host under
+  // load slows both halves of a pair and the ratio divides the contention out.
+  // The gate used to be an absolute ceiling (~1.4us/parse against an 8us
+  // budget): with unrelated heavy jobs running, the absolute reading passed
+  // 8us and the gate failed with no regression in this package.
+  const REFERENCE_SOURCE =
+    '---\nname: reference\ndescription: >\n  A fixed reference header of the same shape and size as the\n  measured one, read only as this gate\'s yardstick.\n---\nbody\n'
+  const REFERENCE_ENTRY = /^([^\s:#][^\s:#]*?)[ \t]*:([ \t]+[^\r\n]*|)$/
+  const reference = () => {
+    const lines = REFERENCE_SOURCE.split('\n')
+    let total = 0
+    for (const line of lines) {
+      const entry = REFERENCE_ENTRY.exec(line)
+      total += entry === null ? line.length : entry[2].length
+    }
+    return total
+  }
+  const measured = () => parseFrontmatter(sources[0]).body.length
   let sink = 0
-  const before = process.cpuUsage()
-  for (let index = 0; index < 2000; index += 1) sink += parseFrontmatter(sources[0]).body.length
-  const spent = process.cpuUsage(before)
-  const perParse = (spent.user + spent.system) / 2000
+  const median = (values) => values.slice().sort((left, right) => left - right)[Math.floor(values.length / 2)]
+  const cpuTime = (from, to) => (to.user - from.user) + (to.system - from.system)
+  /**
+   * Median of paired samples: every measured block is timed beside its reference
+   * block, so contention lands on both halves. Blocks of several calls amortise
+   * `process.cpuUsage`'s microsecond resolution, which on one call quantises a
+   * 1-2us measurement into whole 50% steps.
+   */
+  const pairedRatio = (measure, referenceWork, samples, iterations, referenceIterations) => {
+    const run = (fn, times) => { for (let index = 0; index < times; index += 1) sink += fn() }
+    run(measure, iterations * 20)
+    run(referenceWork, referenceIterations * 20)
+    const ratios = []
+    for (let index = 0; index < samples; index += 1) {
+      const before = process.cpuUsage()
+      run(measure, iterations)
+      const middle = process.cpuUsage()
+      run(referenceWork, referenceIterations)
+      const after = process.cpuUsage()
+      const base = cpuTime(middle, after)
+      if (base > 0) ratios.push(cpuTime(before, middle) / base)
+    }
+    return median(ratios)
+  }
+  // Recorded medians on a host at load 600+: 1.5-1.6x. A doubled header read
+  // measures ~3.0x and a bypassed fast path ~18x, so 2.5x fails a real
+  // regression while leaving half again as much room for process-to-process
+  // spread; the old absolute gate could not tell either from a busy host.
+  const ratio = pairedRatio(measured, reference, 200, 20, 100)
   assert.ok(sink > 0)
-  // CPU time, not wall clock; ~1.4us/parse measured on the Ryzen 9 9950X. The
-  // pre-change reader never reached this path (every header paid the yaml
-  // parse, 32us here), so the band only has to catch that regression.
-  assert.ok(perParse <= 8, `flat frontmatter parse cost ${perParse.toFixed(1)}us, budget 8us`)
+  console.log(`perf-review: flat header ${ratio.toFixed(2)}x the allocation-shaped reference`)
+  assert.ok(ratio <= 2.5, `flat header cost ${ratio.toFixed(2)}x the allocation-shaped reference; limit 2.5x`)
 })
 
 test('discoverSkills reads the bundled skill with a usable description', async () => {
@@ -257,7 +301,8 @@ test('apply registers exactly one skills provider and nothing else', async () =>
 // Instruction-level numbers were recorded with `taskset -c 2 perf stat -e
 // instructions,cycles` over 2000 provider reads: ~1.22M instructions per
 // list+get on this host, ~0.55M of it frontmatter parsing). The tests gate on
-// retired CPU time and on the served text, never on wall clock.
+// served text and on paired CPU-time ratios, never on wall clock or on an
+// absolute microsecond ceiling, which unrelated load on the host decides.
 
 test('the bundled skill parses to a byte-identical catalog and body', async () => {
   const { candidates, complete } = await discoverSkills(skillsDir)
