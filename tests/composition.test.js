@@ -4,7 +4,7 @@
  *
  * The other suites drive plain-object fakes, which cannot show whether a
  * registration is released, and a live profile reloads plugin rows on every
- * edit — a leaked registration would double up on the next reload.
+ * edit, so a leaked registration would double up on the next reload.
  *
  * @module dsh-perf-review/composition
  */
