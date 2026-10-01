@@ -8,9 +8,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse as parseYaml } from 'yaml'
 import { BUNDLED_SKILL_RANK } from '@deepseek-ai/dsh-skill'
-import { apply, createSkillProvider, discoverSkills, parseFrontmatter, parseFrontmatterWithYaml } from './index.js'
+import { apply, createSkillProvider, discoverSkills, parseFrontmatter, parseFrontmatterWithYaml } from '../index.js'
 
-const root = dirname(fileURLToPath(import.meta.url))
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const skillsDir = join(root, 'skills')
 
 /** Matches a static `yaml` import; the perf gate below asserts there is none. */
@@ -24,7 +24,7 @@ const STATIC_YAML_IMPORT = /^\s*import\s[^\n]*['"]yaml['"]/m
 const flatRead = async (source) => {
   const parsed = parseFrontmatter(source)
   if (parsed !== undefined) return parsed
-  const { parseFrontmatterWithYaml } = await import('./index.js')
+  const { parseFrontmatterWithYaml } = await import('../index.js')
   return parseFrontmatterWithYaml(source)
 }
 
@@ -203,7 +203,7 @@ test('list and get settle promptly when the lookup signal is aborted', async () 
 test('a real cordis composition mounts the bundled skill and disposes it', async () => {
   const { Context } = await import('@deepseek-ai/cordis')
   const { default: SkillRegistry } = await import('@deepseek-ai/dsh-skill')
-  const mod = await import('./index.js')
+  const mod = await import('../index.js')
   const ctx = new Context()
   await ctx.plugin(SkillRegistry)
   // The loader mounts the module itself, so the test forwards its `inject`
