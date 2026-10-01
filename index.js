@@ -82,9 +82,8 @@ const PLAIN = /^[^\s!&*\-?{}[\],#|>@`"'%:][^#:]*$/
 const SIMPLE_DOUBLE = /^[^\\]*$/
 /** A single-quoted scalar with no `''` escape in it. */
 const SIMPLE_SINGLE = /^[^']*$/
-/** The block scalar header: style plus an optional indent and/or chomping modifier. */
+/** The block scalar header this reader reads: style plus an optional strip flag. */
 const BLOCK_HEADER = /^([|>])(-)?$/
-/** A block scalar indicator with keep chomping: its trailing newlines are not read here. */
 /** A plain scalar YAML types as an integer: `0x10`, `0o17`, `+5`, `-0`, `007`, `1_000`. */
 const TYPED_INT = /^[-+]?(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*)$/
 /** A plain scalar YAML types as a special float: `.inf`, `.nan`, either sign, any case. */
@@ -98,7 +97,6 @@ const SAFE_FLOAT = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][-+]?\d+)?$/
 const RESOLVED_KEY = /^(?:~|null|Null|NULL|true|True|TRUE|false|False|FALSE)$/
 /** Keys that would not survive `data[key] = value` on an object literal. */
 const UNSAFE_KEY = new Set(['__proto__'])
-/** Keys YAML itself resolves to a non-string: `null` and `true` become `''` and `'true'`. */
 /** A key this reader can prove `yaml` resolves to the same string. */
 const SAFE_KEY = /^[A-Za-z_][A-Za-z0-9_.-]*$/
 /** Code points JS `trim` strips but YAML counts as content: indentation is unprovable. */
@@ -107,7 +105,7 @@ const JS_ONLY_SPACE = /[\u000B\u000C\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\
 /** The delimiter line, exactly as the pre-change reader tested it. */
 const DELIMITER = /^---[ \t]*$/
 
-/** Split a data block into lines: `\r\n`, `\n`, and lone `\r` are all breaks to YAML. */
+/** Split a data block into lines. `parseFrontmatter` refuses any `\r`, so `\n` is the only break. */
 function toLines(text) {
   return text.split('\n')
 }
@@ -149,25 +147,17 @@ function leadingSpaces(line) {
 /**
  * Read one block scalar: same-indent lines only, chomping as YAML defines it.
  * @returns the scalar and the index one past the block, or `undefined` when the
- *   block has an explicit or deeper indent, an interior blank line, or no content.
+ *   block has a deeper-indented line, an interior blank line, or no content.
  */
 function readBlockScalar(lines, header, headerValue) {
   const style = headerValue[0]
   const modifier = headerValue.slice(1)
-  let indent = 0
-  for (const char of modifier) {
-    if (char !== '+' && char !== '-') indent = char.charCodeAt(0) - 48
-  }
-  if (indent === 0) {
-    const first = lines[header + 1]
-    if (first === undefined || leadingSpaces(first) === 0) return undefined
-    indent = leadingSpaces(first)
-  }
+  const first = lines[header + 1]
+  if (first === undefined) return undefined
+  // Indentation is spaces only: a tab is a YAML parse error there, so a
+  // tab-led or unindented first line leaves the block to `yaml`.
+  const indent = leadingSpaces(first)
   if (indent === 0) return undefined
-  const firstContent = lines[header + 1]
-  // A tab is never block-scalar indentation to YAML; it is a parse error there
-  // and would only look like indentation here.
-  if (firstContent === undefined || firstContent.charCodeAt(0) === 9) return undefined
 
   const content = []
   let index = header + 1
@@ -264,11 +254,6 @@ function parseFlatBlock(block) {
     // keys (`0x10`), and the words YAML resolves to `null`/`true`/`false`.
     if (!SAFE_KEY.test(key)) return undefined
     if (RESOLVED_KEY.test(key)) return undefined
-    // A quoted key (`'qk': v`) is unquoted by YAML, not by this reader, and an
-    // unclosed flow mapping (`{a: 1}`) only looks like one entry here.
-    if (key.charCodeAt(0) === 39 || key.charCodeAt(0) === 34 || key.charCodeAt(0) === 123) return undefined
-    // A plain key YAML resolves to `null`/`true`/`false` is not the string this
-    // reader would build.
     // `yaml` rejects a duplicate key and a `__proto__` key does not survive a
     // plain object assignment; both need the real parser.
     if (seen.has(key) || UNSAFE_KEY.has(key)) return undefined
