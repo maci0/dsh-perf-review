@@ -1,9 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse as parseYaml } from 'yaml'
@@ -12,6 +11,9 @@ import { apply, createSkillProvider, discoverSkills, parseFrontmatter, parseFron
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const skillsDir = join(root, 'skills')
+/** Test temp space: the gitignored `.scratch/`, never the OS temp dir. */
+const scratch = join(root, '.scratch')
+mkdirSync(scratch, { recursive: true })
 
 /** Matches a static `yaml` import; the perf gate below asserts there is none. */
 const STATIC_YAML_IMPORT = /^\s*import\s[^\n]*['"]yaml['"]/m
@@ -157,7 +159,7 @@ test('discoverSkills reports an unreadable root as incomplete discovery', async 
 })
 
 test('discoverSkills reports a SKILL.md the reader refuses as incomplete', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'perf-skills-'))
+  const dir = await mkdtemp(join(scratch, 'perf-skills-'))
   try {
     await mkdir(join(dir, 'perf-review'), { recursive: true })
     await writeFile(join(dir, 'perf-review', 'SKILL.md'), '---\nname: [unterminated\ndescription: literal\n---\nbody\n')
@@ -173,7 +175,7 @@ test('discoverSkills reports a SKILL.md the reader refuses as incomplete', async
 })
 
 test('discoverSkills accepts a literal block scalar the reader used to refuse', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'perf-skills-'))
+  const dir = await mkdtemp(join(scratch, 'perf-skills-'))
   try {
     await mkdir(join(dir, 'perf-review'), { recursive: true })
     await writeFile(
@@ -265,7 +267,7 @@ test('the provider reports an unreadable root as an incomplete observation', asy
 })
 
 test('a SKILL.md without name loads under its directory name', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'perf-skills-'))
+  const dir = await mkdtemp(join(scratch, 'perf-skills-'))
   try {
     await mkdir(join(dir, 'perf-review'), { recursive: true })
     await writeFile(join(dir, 'perf-review', 'SKILL.md'), '---\ndescription: >\n  A usable description.\n---\nbody\n')
@@ -281,7 +283,7 @@ test('a SKILL.md without name loads under its directory name', async () => {
 })
 
 test('apply resolves its skills directory from an install path containing a space', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh perf '))
+  const dir = await mkdtemp(join(scratch, 'dsh perf '))
   try {
     const pkg = join(dir, 'pkg')
     await mkdir(pkg)
@@ -473,7 +475,7 @@ test('a CRLF skill still loads instead of being skipped', async () => {
   // body arrives LF-normalized.
   assert.equal(withYaml.body, 'body\n')
 
-  const dir = await mkdtemp(join(tmpdir(), 'perf-frontmatter-'))
+  const dir = await mkdtemp(join(scratch, 'perf-frontmatter-'))
   try {
     await mkdir(join(dir, 'perf-review'))
     await writeFile(join(dir, 'perf-review', 'SKILL.md'), source)
