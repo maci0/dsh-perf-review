@@ -200,6 +200,21 @@ test('list and get settle promptly when the lookup signal is aborted', async () 
   assert.equal(await provider.get(candidate, { signal: controller.signal }), undefined)
 })
 
+test('a lookup aborted mid-read settles without a warning', async () => {
+  const warnings = []
+  const provider = createSkillProvider({ skillsDir, onWarn: (message) => warnings.push(message) })
+  const controller = new AbortController()
+  const listing = provider.list({ signal: controller.signal })
+  controller.abort()
+  assert.deepEqual(await listing, { candidates: [], complete: false })
+  const candidate = (await provider.list())[0]
+  const second = new AbortController()
+  const loading = provider.get(candidate, { signal: second.signal })
+  second.abort()
+  assert.equal(await loading, undefined)
+  assert.deepEqual(warnings, [])
+})
+
 test('a real cordis composition mounts the bundled skill and disposes it', async () => {
   const { Context } = await import('@deepseek-ai/cordis')
   const { default: SkillRegistry } = await import('@deepseek-ai/dsh-skill')

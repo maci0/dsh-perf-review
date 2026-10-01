@@ -38,7 +38,8 @@ async function readSkillFile(path, onWarn, entryName, signal) {
   try {
     source = await readFile(path, { encoding: 'utf8', signal })
   } catch (error) {
-    onWarn?.(`cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`)
+    // An aborted read is the caller withdrawing, not a broken skill.
+    if (!signal?.aborted) onWarn?.(`cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`)
     return undefined
   }
 

@@ -79,7 +79,7 @@ Runtime dependencies: `@deepseek-ai/dsh-skill` and `yaml`, both declared in `pac
 ## Development
 
 ```sh
-npm test           # node --test tests/*.test.js: 59 tests, no build step
+npm test           # node --test tests/*.test.js: 60 tests, no build step
 ```
 
 Node `^22.19 || >=24`. Tests cover the frontmatter parser, discovery, the provider's `list`/`get` contract, abort handling, incomplete-root reporting, and a real Cordis composition that mounts and disposes the provider.
