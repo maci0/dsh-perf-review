@@ -85,8 +85,8 @@ test('a flat frontmatter block never loads yaml', async () => {
 
   // --- perf gate -----------------------------------------------------------
   // CPU time, never wall clock. The measured block is timed next to a fixed
-  // allocation-shaped reference — the same split and per-line regex a header
-  // read does, without any parsing — inside the same window, so a host under
+  // allocation-shaped reference (the same split and per-line regex a header
+  // read does, without any parsing) inside the same window, so a host under
   // load slows both halves of a pair and the ratio divides the contention out.
   // The gate used to be an absolute ceiling (~1.4us/parse against an 8us
   // budget): with unrelated heavy jobs running, the absolute reading passed
@@ -313,8 +313,8 @@ test('the bundled skill parses to a byte-identical catalog and body', async () =
   digest.update(`\u0000${complete}\u0000${loaded.name}\u0000${loaded.content}`)
   assert.equal(
     digest.digest('hex'),
-    'f8a9ce4dfe1c2c8d69b0b0b3a206fa50ddc4ba6d842874c9f74317a019aa9cf9',
-    'the served skill text changed — re-measure and update the digest deliberately',
+    '4a7831f7167f39b537af0868635e52ef9de7ad5b5e20a776cfdb3cafec19f0c5',
+    'the served skill text changed: re-measure and update the digest deliberately',
   )
 })
 

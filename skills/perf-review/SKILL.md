@@ -36,16 +36,16 @@ Wall clock is the product metric and a poor regression test: it moves with frequ
 
 Prefer, in this order:
 
-- **Retired instructions and work counters** — `perf stat -e instructions`, `callgrind`, an `iai`-style harness. Nearly load-independent, and the right gate for an algorithmic regression: instructions retired, bytes moved, allocations, syscalls, branch misses.
-- **CPU time** — `getrusage`, `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`, `/usr/bin/time -v`, shell `time` (user+sys). Excludes blocked time, so I/O wait and descheduling do not move it; it still drifts with frequency and cache contention.
-- **Hardware counters as ratios** — `cache-misses`, `LLC-load-misses`, branch misses. Stable for a fixed workload shape; compare ratios, not absolutes, when the clock can move.
-- **Wall clock last** — for the product-level p50/p95 and a coarse sanity bound only. A CI gate on it needs the median of N runs plus a tolerance band, and a note saying it is load-sensitive.
+- **Retired instructions and work counters:** `perf stat -e instructions`, `callgrind`, an `iai`-style harness. Nearly load-independent, and the right gate for an algorithmic regression: instructions retired, bytes moved, allocations, syscalls, branch misses.
+- **CPU time:** `getrusage`, `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`, `/usr/bin/time -v`, shell `time` (user+sys). Excludes blocked time, so I/O wait and descheduling do not move it; it still drifts with frequency and cache contention.
+- **Hardware counters as ratios:** `cache-misses`, `LLC-load-misses`, branch misses. Stable for a fixed workload shape; compare ratios, not absolutes, when the clock can move.
+- **Wall clock last:** for the product-level p50/p95 and a coarse sanity bound only. A CI gate on it needs the median of N runs plus a tolerance band, and a note saying it is load-sensitive.
 
 Rules for the test itself:
 
 - Fix the scenario and inputs: no network, no remote host, no dependence on a cold or absent filesystem cache, no reliance on another process finishing first.
 - Warm up (JIT, caches, connection pools), then measure. Report cold start separately if it is the thing being optimized.
-- Pin what the platform allows — CPU affinity (`taskset -c 2`), fixed frequency — and record CPU model, runtime version, and tool version beside the number.
+- Pin what the platform allows (CPU affinity with `taskset -c 2`, fixed frequency) and record CPU model, runtime version, and tool version beside the number.
 - Assert a band against a recorded baseline, not an exact value; report the minimum or median of N runs and drop the first.
 - If counters are unavailable (container without perf events, `perf_event_paranoid`, macOS), substitute CPU time and say so. Never fall back to wall clock silently.
 - In a browser, do not gate on `performance.now()`: use a fixed-frame-count synthetic scenario or long-task counts, or run the hot function in Node and read `process.cpuUsage()`.

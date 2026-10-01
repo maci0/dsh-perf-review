@@ -1,10 +1,10 @@
 /**
- * dsh-perf-review — performance review skill for DeepSeek Harness.
+ * dsh-perf-review: performance review skill for DeepSeek Harness.
  *
  * One capability: the bundled `perf-review` skill becomes a `ctx.skills`
  * provider, so it loads through the `skill` tool and appears as
  * `/perf-review` in the composer. No settings, no tool, no command, no
- * browser half — a skill needs none of that.
+ * browser half: a skill needs none of that.
  *
  * Skill content: the user's perf prompt, plus the hot-path/SIMD/data-layout
  * material from gauntlet's perf-review and the critical-path/delivery
@@ -207,7 +207,7 @@ function readScalar(raw) {
     // reader converts identically may pass, every other form goes to `yaml`.
     if (SAFE_INT.test(raw) || SAFE_FLOAT.test(raw)) return { value: Number(raw) }
     // Any other exponent spelling is YAML's floatExp, whose mantissa may be
-    // `.5`, `1.`, or zero-padded (`01e9`, `00e0`) — none of which this reader
+    // `.5`, `1.`, or zero-padded (`01e9`, `00e0`), none of which this reader
     // converts, so it must not claim the block.
     if (/[eE]/.test(raw)) return undefined
     if (TYPED_INT.test(raw) || TYPED_FLOAT.test(raw) || /^[-+]/.test(raw) || raw.includes('_')) return undefined
