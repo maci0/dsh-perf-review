@@ -14,7 +14,7 @@ import test from 'node:test'
 
 import { Context, Service } from '@deepseek-ai/cordis'
 
-import { apply } from './index.js'
+import { apply } from '../index.js'
 
 /** The skill registry seam: what `ctx.skills.registerProvider` needs. */
 class SkillsSeam extends Service {
