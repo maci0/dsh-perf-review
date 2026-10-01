@@ -79,10 +79,11 @@ Runtime dependencies: `@deepseek-ai/dsh-skill` and `yaml`, both declared in `pac
 ## Development
 
 ```sh
-npm test           # node --test tests/*.test.js: 60 tests, no build step
+bun install --frozen-lockfile
+bun test           # tests/*.test.js: 60 tests, no build step
 ```
 
-Node `^22.19 || >=24`. Tests cover the frontmatter parser, discovery, the provider's `list`/`get` contract, abort handling, incomplete-root reporting, and a real Cordis composition that mounts and disposes the provider.
+dsh loads plugins on Node `^22.19.0 || >=24.0.0`; development and tests run on bun. Tests cover the frontmatter parser, discovery, the provider's `list`/`get` contract, abort handling, incomplete-root reporting, and a real Cordis composition that mounts and disposes the provider.
 
 For local development, install the checkout as a bundle:
 
