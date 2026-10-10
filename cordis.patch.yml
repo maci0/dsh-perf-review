@@ -7,4 +7,4 @@
 # dedupe ids, and a second row would register the plugin twice.
 - insert:
     - id: perf-review
-      name: 'dsh-perf-review'
+      name: '@maci0/dsh-perf-review'

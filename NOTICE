@@ -1,0 +1,9 @@
+dsh-perf-review
+
+The bundled perf-review skill includes material adapted from the perf-review,
+webperf-review, concurrency, resource, database, and cache reviews in
+maci0/gauntlet (https://github.com/maci0/gauntlet), identified in this
+repository as AGPL-3.0 material. The distributed package is AGPL-3.0-only.
+
+The original MIT license notice for the DSH adapter is retained in LICENSE-MIT.
+Copyright (c) 2026 dsh-perf-review contributors.
