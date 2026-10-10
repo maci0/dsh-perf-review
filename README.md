@@ -23,17 +23,19 @@ The whole plugin is one skill: instructions the agent follows, not a profiler. I
 > row added with `--patch` is an overlay: it disappears at the next start.
 
 ```sh
-dsh plugin --profile web add github:maci0/dsh-perf-review#v0.10.0
+dsh plugin --profile web add github:maci0/dsh-perf-review#v0.11.0
 ```
 
-Pin a release tag: a bare `github:` spec floats on `main`. To upgrade, run the same command with the newer tag, then restart `dsh web` (bundle layers compose at boot).
+Pin a release tag: a bare `github:` spec floats on `main`. To upgrade, run the
+same command with the newer tag, then restart `dsh web` (bundle layers compose
+at boot).
 
 The package declares `dsh.bundle.patch`, so the CLI appends it to `dsh.profile.bundles` and its shipped `cordis.patch.yml` supplies the row. Do not paste that row into `~/.dsh/profiles/web/cordis.patch.yml` as well: the bundle layer already applies it, and a second row registers the plugin twice.
 
 Uninstall with the package name:
 
 ```sh
-dsh plugin --profile web remove dsh-perf-review
+dsh plugin --profile web remove @maci0/dsh-perf-review
 ```
 
 That drops the dependency and the bundle layer with it; nothing else to edit.
@@ -93,4 +95,6 @@ dsh plugin --profile <name> add <path-to-checkout>
 
 ## Licence
 
-MIT. Gauntlet-derived lines in the skill are adapted from AGPL-3.0 material, which is copyleft for distributed derivatives. This package is marked MIT to match its sisters, but if you publish it, either reword those lines into your own prompt's voice or relicense to AGPL-3.0 to comply.
+AGPL-3.0-only. The bundled skill includes material adapted from
+[maci0/gauntlet](https://github.com/maci0/gauntlet). See `LICENSE` and `NOTICE`.
+The original MIT notice for the DSH adapter is retained in `LICENSE-MIT`.
