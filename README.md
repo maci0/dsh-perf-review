@@ -23,7 +23,7 @@ The whole plugin is one skill: instructions the agent follows, not a profiler. I
 > row added with `--patch` is an overlay: it disappears at the next start.
 
 ```sh
-dsh plugin --profile web add github:maci0/dsh-perf-review#v0.11.0
+dsh plugin --profile web add github:maci0/dsh-perf-review#v0.11.1
 ```
 
 Pin a release tag: a bare `github:` spec floats on `main`. To upgrade, run the

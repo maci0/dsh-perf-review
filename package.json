@@ -1,6 +1,6 @@
 {
   "name": "@maci0/dsh-perf-review",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -42,12 +42,12 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-skill": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-skill": "0.2.1-alpha.3",
     "yaml": "2.9.1"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.5-alpha.1",
-    "@deepseek-ai/dsh-scope": "0.2.1-alpha.2"
+    "@deepseek-ai/cordis": "4.0.5-alpha.2",
+    "@deepseek-ai/dsh-scope": "0.2.1-alpha.3"
   },
   "repository": {
     "type": "git",
