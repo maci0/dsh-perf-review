@@ -23,12 +23,11 @@ The whole plugin is one skill: instructions the agent follows, not a profiler. I
 > row added with `--patch` is an overlay: it disappears at the next start.
 
 ```sh
-dsh plugin --profile web add github:maci0/dsh-perf-review#v0.11.1
+dsh plugin --profile web add --save-exact @maci0/dsh-perf-review@0.12.0
 ```
 
-Pin a release tag: a bare `github:` spec floats on `main`. To upgrade, run the
-same command with the newer tag, then restart `dsh web` (bundle layers compose
-at boot).
+Pin an exact npm version. To upgrade, run the same command with the newer
+version, then restart `dsh web` (bundle layers compose at boot).
 
 The package declares `dsh.bundle.patch`, so the CLI appends it to `dsh.profile.bundles` and its shipped `cordis.patch.yml` supplies the row. Do not paste that row into `~/.dsh/profiles/web/cordis.patch.yml` as well: the bundle layer already applies it, and a second row registers the plugin twice.
 
